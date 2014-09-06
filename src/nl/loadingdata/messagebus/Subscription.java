@@ -5,18 +5,30 @@ import java.util.Queue;
 
 public class Subscription<T extends Event> {
 	private MessageBus bus;
-	private Queue<T> pending;
+	private Queue<EventWrapper<T>> pending;
 	private EventListener<T> eventListener;
 	private Thread thread;
 	private boolean running;
 	private Class<T> clazz;
 	private EventFilter<T> filter;
 
-	Subscription(MessageBus bus, EventFilter<T> filter, Class<T> clazz) {
-		pending = new LinkedList<T>();
+	Subscription(MessageBus bus, EventFilter<T> filter, Class<T> clazz, EventListener<T> listener) {
 		this.bus = bus;
 		this.filter = filter;
 		this.clazz = clazz;
+		this.eventListener = listener;
+		pending = new LinkedList<>();
+		running = true;
+		thread = new Thread(() -> {
+			while (running) {
+				EventWrapper<T> event = getEvent();
+				if (event != null) {
+					eventListener.onEvent(event.event);
+					event.complete();
+				}
+			}
+		});
+		thread.start();
 	}
 
 	public void cancel() {
@@ -30,8 +42,8 @@ public class Subscription<T extends Event> {
 		}
 	}
 	
-	public T getEvent() {
-		T event = null;
+	public EventWrapper<T> getEvent() {
+		EventWrapper<T> event = null;
 		while (bus != null && event == null) {
 			synchronized (pending) {
 				event = pending.poll();
@@ -47,27 +59,6 @@ public class Subscription<T extends Event> {
 		return event;
 	}
 	
-	public void onEvent(EventListener<T> l) {
-		eventListener = l;
-		if (l == null && thread != null) {
-			running = false;
-			synchronized(thread) {
-				thread.notify();
-			}
-		} else if (l != null && thread == null) {
-			running = true;
-			thread = new Thread(() -> {
-				while (running) {
-					T event = getEvent();
-					if (event != null) {
-						eventListener.onEvent(event);
-					}
-				}
-			});
-			thread.start();
-		}
-	}
-	
 	void shutdown() {
 		bus = null;
 		running = false;
@@ -79,7 +70,7 @@ public class Subscription<T extends Event> {
 		}
 	}
 	
-	void dispatch(T event) {
+	void dispatch(EventWrapper<T> event) {
 		synchronized (pending) {
 			pending.add(event);
 			pending.notify();

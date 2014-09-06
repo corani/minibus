@@ -35,16 +35,16 @@ public class FizzBuzz {
 		);
 		// PRINT
 		bus.subscribe(PrintEvent.class,
-			(PrintEvent e) -> System.out.print(e.string)
+			e -> System.out.print(e.string)
 		);
 		
 		// SCHEDULE
 		for (int i = 0; i < 105; i++) {
 			FBItem item = new FBItem();
-			item.whenComplete(
-				fbi -> bus.publish(new CompleteEvent(fbi))
+			bus.publish(
+				new NumberEvent(i + 1, item), 
+				e -> bus.publish(new CompleteEvent(e.item))
 			);
-			bus.publish(new NumberEvent(i + 1, item));
 		}
 
 		// WAIT

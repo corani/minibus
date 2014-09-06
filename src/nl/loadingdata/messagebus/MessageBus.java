@@ -8,15 +8,14 @@ import java.util.Queue;
 public class MessageBus implements Runnable {
 	private Thread thread;
 	private boolean requestStop = false;
-	private Queue<Event> events = new LinkedList<>();
+	private Queue<EventWrapper<? extends Event>> events = new LinkedList<>();
 	private List<Subscription<? extends Event>> subscriptions = new ArrayList<>(); 
 
 	public <T extends Event> Subscription<T> subscribe(Class<T> clazz, EventFilter<T> filter, EventListener<T> listener) {
-		Subscription<T> sub = new Subscription<T>(this, filter, clazz);
+		Subscription<T> sub = new Subscription<T>(this, filter, clazz, listener);
 		synchronized (subscriptions) {
 			subscriptions.add(sub);
 		}
-		sub.onEvent(listener);
 		return sub;
 	}
 
@@ -30,15 +29,24 @@ public class MessageBus implements Runnable {
 		}
 	}
 	
-	public void publish(Event event) {
+	public <T extends Event> void publish(T event, EventHandledCallback<T> cb) {
 		synchronized (events) {
-			events.add(event);
+			events.add(cast(event, cb));
 			if (thread != null) {
 				synchronized (thread) {
 					thread.notify();
 				}
 			}
 		}
+	}
+
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	private <T extends Event> EventWrapper<?> cast(T event, EventHandledCallback<T> cb) {
+		return new EventWrapper(event, cb);
+	}
+	
+	public <T extends Event> void publish(T event) {
+		publish(event, null);
 	}
 	
 	public boolean isIdle() {
@@ -72,7 +80,7 @@ public class MessageBus implements Runnable {
 	@Override
 	public void run() {
 		while (!requestStop) {
-			Event event = null;
+			EventWrapper<?> event = null;
 			synchronized (events) {
 				event = events.poll();
 			}
@@ -100,15 +108,16 @@ public class MessageBus implements Runnable {
 		return (Subscription<T>) sub;
 	}
 	
-	private <T extends Event> void dispatch(T event) {
+	private <T extends Event> void dispatch(EventWrapper<T> event) {
 		List<Subscription<T>> matching = new ArrayList<>();
 		synchronized (subscriptions) {
 			subscriptions.forEach(sub -> {
-				if (sub.wants(event)) {
+				if (sub.wants(event.event)) {
 					matching.add(cast(sub));
 				}
 			});
 		}
+		event.subscribers = matching.size();
 		matching.forEach(sub -> sub.dispatch(event));
 	}
 	
