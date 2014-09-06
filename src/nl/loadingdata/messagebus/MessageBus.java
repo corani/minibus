@@ -11,7 +11,7 @@ public class MessageBus implements Runnable {
 	private Queue<EventWrapper<? extends Event>> events = new LinkedList<>();
 	private List<Subscription<? extends Event>> subscriptions = new ArrayList<>(); 
 
-	public <T extends Event> Subscription<T> subscribe(Class<T> clazz, EventFilter<T> filter, EventListener<T> listener) {
+	public <T extends Event> Subscription<T> subscribe(Class<T> clazz, EventFilter<T> filter, EventHandler<T> listener) {
 		Subscription<T> sub = new Subscription<T>(this, filter, clazz, listener);
 		synchronized (subscriptions) {
 			subscriptions.add(sub);
@@ -19,7 +19,7 @@ public class MessageBus implements Runnable {
 		return sub;
 	}
 
-	public <T extends Event> Subscription<T> subscribe(Class<T> clazz, EventListener<T> listener) {
+	public <T extends Event> Subscription<T> subscribe(Class<T> clazz, EventHandler<T> listener) {
 		return subscribe(clazz, null, listener);
 	}
 
@@ -31,7 +31,7 @@ public class MessageBus implements Runnable {
 	
 	public <T extends Event> void publish(T event, EventHandledCallback<T> cb) {
 		synchronized (events) {
-			events.add(cast(event, cb));
+			events.add(wrap(event, cb));
 			if (thread != null) {
 				synchronized (thread) {
 					thread.notify();
@@ -40,11 +40,6 @@ public class MessageBus implements Runnable {
 		}
 	}
 
-	@SuppressWarnings({ "unchecked", "rawtypes" })
-	private <T extends Event> EventWrapper<?> cast(T event, EventHandledCallback<T> cb) {
-		return new EventWrapper(event, cb);
-	}
-	
 	public <T extends Event> void publish(T event) {
 		publish(event, null);
 	}
@@ -103,6 +98,11 @@ public class MessageBus implements Runnable {
 		thread = null;
 	}
 
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	private <T extends Event> EventWrapper<?> wrap(T event, EventHandledCallback<T> cb) {
+		return new EventWrapper(event, cb);
+	}
+	
 	@SuppressWarnings("unchecked")
 	private <T extends Event> Subscription<T> cast(Subscription<?> sub) {
 		return (Subscription<T>) sub;
@@ -112,12 +112,12 @@ public class MessageBus implements Runnable {
 		List<Subscription<T>> matching = new ArrayList<>();
 		synchronized (subscriptions) {
 			subscriptions.forEach(sub -> {
-				if (sub.wants(event.event)) {
+				if (sub.wants(event.getEvent())) {
 					matching.add(cast(sub));
 				}
 			});
 		}
-		event.subscribers = matching.size();
+		event.setSubscribers(matching.size());
 		matching.forEach(sub -> sub.dispatch(event));
 	}
 	

@@ -1,18 +1,26 @@
 package nl.loadingdata.messagebus;
 
 public class EventWrapper<T extends Event> {
-	T event;
-	EventHandledCallback<T> cb;
-	int subscribers;
+	private T event;
+	private EventHandledCallback<T> cb;
+	private int subscribers;
 
-	public EventWrapper(T event, EventHandledCallback<T> cb) {
+	EventWrapper(T event, EventHandledCallback<T> cb) {
 		this.event = event;
 		this.cb = cb;
 	}
 
-	public void complete() {
+	void complete() {
 		if (--subscribers == 0 && cb != null) {
 			cb.onHandled(event);
 		}
+	}
+
+	void setSubscribers(int subscribers) {
+		this.subscribers = subscribers;
+	}
+
+	T getEvent() {
+		return event;
 	}
 }

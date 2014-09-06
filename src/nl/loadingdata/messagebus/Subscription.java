@@ -6,13 +6,13 @@ import java.util.Queue;
 public class Subscription<T extends Event> {
 	private MessageBus bus;
 	private Queue<EventWrapper<T>> pending;
-	private EventListener<T> eventListener;
+	private EventHandler<T> eventListener;
 	private Thread thread;
 	private boolean running;
 	private Class<T> clazz;
 	private EventFilter<T> filter;
 
-	Subscription(MessageBus bus, EventFilter<T> filter, Class<T> clazz, EventListener<T> listener) {
+	Subscription(MessageBus bus, EventFilter<T> filter, Class<T> clazz, EventHandler<T> listener) {
 		this.bus = bus;
 		this.filter = filter;
 		this.clazz = clazz;
@@ -23,7 +23,7 @@ public class Subscription<T extends Event> {
 			while (running) {
 				EventWrapper<T> event = getEvent();
 				if (event != null) {
-					eventListener.onEvent(event.event);
+					eventListener.onEvent(event.getEvent());
 					event.complete();
 				}
 			}
