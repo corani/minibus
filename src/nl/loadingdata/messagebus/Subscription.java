@@ -21,7 +21,7 @@ public class Subscription<T extends Event> {
 		running = true;
 		thread = new Thread(() -> {
 			while (running) {
-				EventWrapper<T> event = getEvent();
+				EventWrapper<T> event = nextEvent();
 				if (event != null) {
 					eventListener.onEvent(event.getEvent());
 					event.complete();
@@ -31,18 +31,7 @@ public class Subscription<T extends Event> {
 		thread.start();
 	}
 
-	public void cancel() {
-		bus.unsubscribe(this);
-		bus = null;
-	}
-	
-	public boolean hasEventWaiting() {
-		synchronized (pending) {
-			return !pending.isEmpty();
-		}
-	}
-	
-	public EventWrapper<T> getEvent() {
+	private EventWrapper<T> nextEvent() {
 		EventWrapper<T> event = null;
 		while (bus != null && event == null) {
 			synchronized (pending) {
@@ -58,25 +47,32 @@ public class Subscription<T extends Event> {
 		}
 		return event;
 	}
-	
+
 	void shutdown() {
+		bus.unsubscribe(this);
 		bus = null;
+
 		running = false;
-		synchronized (pending) {
-			pending.notify();
-		}
 		synchronized (thread) {
 			thread.notify();
 		}
+
+		synchronized (pending) {
+			for (EventWrapper<T> e : pending) {
+				e.complete();
+			}
+			pending.clear();
+			pending.notify();
+		}
 	}
-	
+
 	void dispatch(EventWrapper<T> event) {
 		synchronized (pending) {
 			pending.add(event);
 			pending.notify();
 		}
 	}
-	
+
 	boolean wants(Event event) {
 		boolean result = event.getClass().isAssignableFrom(clazz);
 		if (result && filter != null) {
@@ -84,7 +80,7 @@ public class Subscription<T extends Event> {
 		}
 		return result;
 	}
-	
+
 	boolean isIdle() {
 		synchronized (pending) {
 			return pending.isEmpty();
@@ -95,5 +91,4 @@ public class Subscription<T extends Event> {
 	private T cast(Event event) {
 		return (T) event;
 	}
-
 }

@@ -4,11 +4,11 @@ import nl.loadingdata.messagebus.MessageBus;
 
 
 public class FizzBuzz {
-	
+
 	public static void main(String[] args) {
 		final MessageBus bus = new MessageBus();
 		bus.start();
-		
+
 		// NUMBER
 		bus.subscribe(NumberEvent.class,
 			e -> e.item.update(FBItem.NUMBER, true, "" + e.number)
@@ -37,11 +37,11 @@ public class FizzBuzz {
 		bus.subscribe(PrintEvent.class,
 			e -> System.out.print(e.string)
 		);
-		
+
 		// SCHEDULE
 		for (int i = 0; i < 105; i++) {
-			bus.publish(
-				new NumberEvent(i + 1, new FBItem()), 
+			NumberEvent numberEvent = new NumberEvent(i + 1, new FBItem());
+			bus.publish(numberEvent,
 				e -> bus.publish(new CompleteEvent(e.item))
 			);
 		}
@@ -56,5 +56,4 @@ public class FizzBuzz {
 		}
 		bus.stop();
 	}
-
 }
