@@ -40,9 +40,8 @@ public class FizzBuzz {
 		
 		// SCHEDULE
 		for (int i = 0; i < 105; i++) {
-			FBItem item = new FBItem();
 			bus.publish(
-				new NumberEvent(i + 1, item), 
+				new NumberEvent(i + 1, new FBItem()), 
 				e -> bus.publish(new CompleteEvent(e.item))
 			);
 		}
