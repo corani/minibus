@@ -8,4 +8,9 @@ public class PrintEvent implements Event {
 	public PrintEvent(String string) {
 		this.string = string;
 	}
+	
+	@Override
+	public String toString() {
+		return string;
+	}
 }
