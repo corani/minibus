@@ -1,9 +1,10 @@
 package nl.loadingdata.messagebus;
 
 import java.util.LinkedList;
+import java.util.Optional;
 import java.util.Queue;
 
-public class Subscription<T extends Event> {
+public class Subscription<T extends Event> implements Runnable {
 	private MessageBus bus;
 	private Queue<EventWrapper<T>> pending;
 	private EventHandler<T> eventListener;
@@ -19,19 +20,20 @@ public class Subscription<T extends Event> {
 		this.eventListener = listener;
 		pending = new LinkedList<>();
 		running = true;
-		thread = new Thread(() -> {
-			while (running) {
-				EventWrapper<T> event = nextEvent();
-				if (event != null) {
-					eventListener.onEvent(event.getEvent());
-					event.complete();
-				}
-			}
-		});
+		thread = new Thread(this);
 		thread.start();
 	}
 
-	private EventWrapper<T> nextEvent() {
+	public void run() {
+		while (running) {
+			nextEvent().ifPresent(event -> {
+				eventListener.onEvent(event.getEvent());
+				event.complete();
+			});
+		}
+	}
+
+	private Optional<EventWrapper<T>> nextEvent() {
 		EventWrapper<T> event = null;
 		while (bus != null && event == null) {
 			synchronized (pending) {
@@ -45,7 +47,7 @@ public class Subscription<T extends Event> {
 				}
 			}
 		}
-		return event;
+		return Optional.ofNullable(event);
 	}
 
 	void shutdown() {
@@ -58,9 +60,7 @@ public class Subscription<T extends Event> {
 		}
 
 		synchronized (pending) {
-			for (EventWrapper<T> e : pending) {
-				e.complete();
-			}
+			pending.forEach(e -> e.complete());
 			pending.clear();
 			pending.notify();
 		}

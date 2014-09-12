@@ -1,6 +1,6 @@
 package nl.loadingdata.example;
 
-import static java.util.stream.IntStream.range;
+import static java.util.stream.IntStream.rangeClosed;
 
 import nl.loadingdata.messagebus.MessageBus;
 
@@ -41,12 +41,11 @@ public class FizzBuzz {
 		);
 
 		// SCHEDULE
-		range(0, 105).forEach(i -> {
-			NumberEvent numberEvent = new NumberEvent(i + 1, new FBItem());
-			bus.publish(numberEvent,
+		rangeClosed(1, 105).forEach(i ->
+			bus.publish(new NumberEvent(i),
 				e -> bus.publish(new CompleteEvent(e.item))
-			);
-		});
+			)
+		);
 
 		// WAIT
 		while (!bus.isIdle()) {

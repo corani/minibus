@@ -54,11 +54,9 @@ public class MessageBus implements Runnable {
 			if (!events.isEmpty()) return false;
 		}
 		synchronized (subscriptions) {
-			for (Subscription<? extends Event> sub : subscriptions) {
-				if (!sub.isIdle()) return false;
-			}
+			return subscriptions.parallelStream()
+						.allMatch(s -> s.isIdle());
 		}
-		return true;
 	}
 
 	public synchronized void start() {
@@ -116,11 +114,9 @@ public class MessageBus implements Runnable {
 	private <T extends Event> void dispatch(EventWrapper<T> event) {
 		List<Subscription<T>> matching = new ArrayList<>();
 		synchronized (subscriptions) {
-			subscriptions.forEach(sub -> {
-				if (sub.wants(event.getEvent())) {
-					matching.add(cast(sub));
-				}
-			});
+			subscriptions.parallelStream()
+				.filter(s -> s.wants(event.getEvent()))
+				.forEach(e -> matching.add(cast(e)));
 		}
 		event.setSubscribers(matching.size());
 		matching.forEach(sub -> sub.dispatch(event));

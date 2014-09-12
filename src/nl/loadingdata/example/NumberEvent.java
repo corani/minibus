@@ -6,8 +6,8 @@ public class NumberEvent implements Event {
 	int number;
 	FBItem item;
 
-	public NumberEvent(int number, FBItem item) {
+	public NumberEvent(int number) {
 		this.number = number;
-		this.item = item;
+		this.item = new FBItem();
 	}
 }
