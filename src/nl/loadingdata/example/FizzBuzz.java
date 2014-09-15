@@ -1,7 +1,6 @@
 package nl.loadingdata.example;
 
 import static java.util.stream.IntStream.rangeClosed;
-
 import nl.loadingdata.messagebus.MessageBus;
 
 

@@ -1,12 +1,9 @@
 package nl.loadingdata.messagebus;
 
-import java.util.LinkedList;
-import java.util.Optional;
-import java.util.Queue;
 
 public class Subscription<T extends Event> implements Runnable {
 	private MessageBus bus;
-	private Queue<EventWrapper<T>> pending;
+	private EventQueue pending;
 	private EventHandler<T> eventListener;
 	private Thread thread;
 	private boolean running;
@@ -18,7 +15,7 @@ public class Subscription<T extends Event> implements Runnable {
 		this.filter = filter;
 		this.clazz = clazz;
 		this.eventListener = listener;
-		pending = new LinkedList<>();
+		pending = new EventQueue();
 		running = true;
 		thread = new Thread(this);
 		thread.start();
@@ -26,28 +23,12 @@ public class Subscription<T extends Event> implements Runnable {
 
 	public void run() {
 		while (running) {
-			nextEvent().ifPresent(event -> {
-				eventListener.onEvent(event.getEvent());
-				event.complete();
-			});
+			pending.next()
+				.ifPresent(event -> {
+					eventListener.onEvent(pending.unwrap(event));
+					event.complete();
+				});
 		}
-	}
-
-	private Optional<EventWrapper<T>> nextEvent() {
-		EventWrapper<T> event = null;
-		while (bus != null && event == null) {
-			synchronized (pending) {
-				event = pending.poll();
-				if (event == null) {
-					try {
-						pending.wait();
-					} catch (InterruptedException e) {
-						e.printStackTrace();
-					}
-				}
-			}
-		}
-		return Optional.ofNullable(event);
 	}
 
 	void shutdown() {
@@ -59,18 +40,11 @@ public class Subscription<T extends Event> implements Runnable {
 			thread.notify();
 		}
 
-		synchronized (pending) {
-			pending.forEach(e -> e.complete());
-			pending.clear();
-			pending.notify();
-		}
+		pending.shutdown();
 	}
 
 	void dispatch(EventWrapper<T> event) {
-		synchronized (pending) {
-			pending.add(event);
-			pending.notify();
-		}
+		pending.add(event);
 	}
 
 	boolean wants(Event event) {
@@ -82,9 +56,7 @@ public class Subscription<T extends Event> implements Runnable {
 	}
 
 	boolean isIdle() {
-		synchronized (pending) {
-			return pending.isEmpty();
-		}
+		return pending.isIdle();
 	}
 
 	@SuppressWarnings("unchecked")

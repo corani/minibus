@@ -1,21 +1,16 @@
 package nl.loadingdata.messagebus;
-import java.util.ArrayList;
-import java.util.LinkedList;
 import java.util.List;
-import java.util.Queue;
 
 
 public class MessageBus implements Runnable {
 	private Thread thread;
 	private boolean requestStop = false;
-	private Queue<EventWrapper<? extends Event>> events = new LinkedList<>();
-	private List<Subscription<? extends Event>> subscriptions = new ArrayList<>();
+	private EventQueue events = new EventQueue();
+	private SubscriptionList subscriptions = new SubscriptionList();
 
 	public <T extends Event> Subscription<T> subscribe(Class<T> clazz, EventFilter<T> filter, EventHandler<T> listener) {
 		Subscription<T> sub = new Subscription<T>(this, filter, clazz, listener);
-		synchronized (subscriptions) {
-			subscriptions.add(sub);
-		}
+		subscriptions.add(sub);
 		return sub;
 	}
 
@@ -25,9 +20,7 @@ public class MessageBus implements Runnable {
 
 	public void unsubscribe(Subscription<? extends Event> sub) {
 		if (!requestStop) {
-			synchronized (subscriptions) {
-				subscriptions.remove(sub);
-			}
+			subscriptions.remove(sub);
 		}
 	}
 
@@ -36,12 +29,7 @@ public class MessageBus implements Runnable {
 			throw new IllegalStateException("MessageBus shutting down");
 		}
 		synchronized (events) {
-			events.add(wrap(event, cb));
-			if (thread != null) {
-				synchronized (thread) {
-					thread.notify();
-				}
-			}
+			events.add(event, cb);
 		}
 	}
 
@@ -50,16 +38,18 @@ public class MessageBus implements Runnable {
 	}
 
 	public boolean isIdle() {
-		synchronized (events) {
-			if (!events.isEmpty()) return false;
-		}
-		synchronized (subscriptions) {
-			return subscriptions.parallelStream()
-						.allMatch(s -> s.isIdle());
-		}
+		if (!events.isEmpty()) return false;
+		return subscriptions.isIdle();
+	}
+
+	public boolean isRunning() {
+		return (thread != null) && !requestStop;
 	}
 
 	public synchronized void start() {
+		if (requestStop) {
+			throw new IllegalStateException("MessageBus shutting down");
+		}
 		if (thread == null) {
 			thread = new Thread(this);
 			thread.start();
@@ -69,56 +59,26 @@ public class MessageBus implements Runnable {
 	public synchronized void stop() {
 		if (thread != null) {
 			requestStop = true;
-			synchronized (thread) {
-				thread.notify();
-			}
+			events.shutdown();
 		}
 	}
 
 	@Override
 	public void run() {
 		while (!requestStop) {
-			EventWrapper<?> event = null;
-			synchronized (events) {
-				event = events.poll();
-			}
-			if (event != null) {
-				dispatch(event);
-			} else {
-				synchronized (thread) {
-					try {
-						thread.wait();
-					} catch (InterruptedException e) {
-						e.printStackTrace();
-					}
-				}
-			}
+			events.next()
+				.ifPresent(event -> dispatch(event));
 		}
-		synchronized (subscriptions) {
-			subscriptions.forEach(sub -> sub.shutdown());
-			subscriptions.clear();
-		}
+		subscriptions.shutdown();
+		events.shutdown();
 		thread = null;
-	}
-
-	@SuppressWarnings({ "unchecked", "rawtypes" })
-	private <T extends Event> EventWrapper<?> wrap(T event, EventHandledCallback<T> cb) {
-		return new EventWrapper(event, cb);
-	}
-
-	@SuppressWarnings("unchecked")
-	private <T extends Event> Subscription<T> cast(Subscription<?> sub) {
-		return (Subscription<T>) sub;
+		requestStop = false;
 	}
 
 	private <T extends Event> void dispatch(EventWrapper<T> event) {
-		List<Subscription<T>> matching = new ArrayList<>();
-		synchronized (subscriptions) {
-			subscriptions.parallelStream()
-				.filter(s -> s.wants(event.getEvent()))
-				.forEach(e -> matching.add(cast(e)));
-		}
+		List<Subscription<T>> matching = subscriptions.allMatching(event);
 		event.setSubscribers(matching.size());
 		matching.forEach(sub -> sub.dispatch(event));
 	}
+
 }
