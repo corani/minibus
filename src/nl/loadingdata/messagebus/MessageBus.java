@@ -75,10 +75,10 @@ public class MessageBus implements Runnable {
 		requestStop = false;
 	}
 
-	private <T extends Event> void dispatch(EventWrapper<T> event) {
-		List<Subscription<T>> matching = subscriptions.allMatching(event);
-		event.setSubscribers(matching.size());
-		matching.forEach(sub -> sub.dispatch(event));
+	private <T extends Event> void dispatch(EventWrapper<T> wrapper) {
+		List<Subscription<T>> matching = subscriptions.allMatching(wrapper.getEvent());
+		wrapper.setSubscribers(matching.size());
+		matching.forEach(sub -> sub.dispatch(wrapper));
 	}
 
 }
