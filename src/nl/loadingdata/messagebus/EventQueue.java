@@ -4,6 +4,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Optional;
 import java.util.Queue;
+import java.util.function.Consumer;
 
 class EventQueue {
 	private Queue<EventWrapper<? extends Event>> queue = new LinkedList<>();
@@ -35,10 +36,6 @@ class EventQueue {
 		}
 	}
 	
-	public Iterable<Optional<EventWrapper<? extends Event>>> iterable() {
-		return () -> new EQIterator<>();
-	}
-	
 	public <E extends Event> boolean add(E event, EventHandledCallback<E> cb) {
 		return add(wrap(event, cb));
 	}
@@ -58,7 +55,7 @@ class EventQueue {
 	public void shutdown() {
 		running = false;
 		synchronized (queue) {
-			queue.forEach(e -> e.complete());
+			queue.forEach(e -> e.cancel());
 			queue.clear();
 		}
 		synchronized (this) {
@@ -87,5 +84,15 @@ class EventQueue {
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}			
+	}
+	
+	private Iterable<Optional<EventWrapper<? extends Event>>> iterable() {
+		return () -> new EQIterator<>();
+	}
+
+	public void forEach(Consumer<EventWrapper<? extends Event>> eventAction) {
+		iterable().forEach(optional ->
+			optional.ifPresent(eventAction)
+		);
 	}
 }

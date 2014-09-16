@@ -16,6 +16,13 @@ class EventWrapper<T extends Event> {
 		}
 	}
 
+	void cancel() {
+		subscribers = 0;
+		if (cb != null) {
+			cb.onCancelled(event);
+		}
+	}
+
 	void setSubscribers(int subscribers) {
 		this.subscribers = subscribers;
 	}

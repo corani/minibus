@@ -1,9 +1,8 @@
 package nl.loadingdata.messagebus;
 
-import java.util.Optional;
 
 
-class Subscription<T extends Event> implements Runnable {
+class Subscription<T extends Event> {
 	private MessageBus bus;
 	private EventQueue pending;
 	private EventHandler<T> eventListener;
@@ -17,27 +16,24 @@ class Subscription<T extends Event> implements Runnable {
 		this.clazz = clazz;
 		this.eventListener = listener;
 		pending = new EventQueue();
-		thread = new Thread(this);
-		thread.start();
-	}
-
-	public void run() {
-		for (Optional<EventWrapper<? extends Event>> optional : pending.iterable()) {
-			optional.ifPresent(event -> {
+		thread = new Thread(() -> {
+			// This call loops until the event queue is shut down
+			pending.forEach(event -> {
 				eventListener.onEvent(pending.unwrap(event));
 				event.complete();
 			});
-		}
+		});
+		thread.start();
 	}
 
-	void shutdown() {
+	public void shutdown() {
 		bus.unsubscribe(this);
 		bus = null;
-
 		pending.shutdown();
-		synchronized (thread) {
-			thread.notify();
-		}
+	}
+
+	public boolean isIdle() {
+		return pending.isIdle();
 	}
 
 	void dispatch(EventWrapper<T> event) {
@@ -50,10 +46,6 @@ class Subscription<T extends Event> implements Runnable {
 			result = filter.test(cast(event));
 		}
 		return result;
-	}
-
-	boolean isIdle() {
-		return pending.isIdle();
 	}
 
 	@SuppressWarnings("unchecked")

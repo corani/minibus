@@ -1,9 +1,8 @@
 package nl.loadingdata.messagebus;
+
 import java.util.List;
-import java.util.Optional;
 
-
-public class MessageBus implements Runnable {
+public class MessageBus {
 	private Thread thread;
 	private boolean requestStop = false;
 	private EventQueue events = new EventQueue();
@@ -29,9 +28,7 @@ public class MessageBus implements Runnable {
 		if (requestStop) {
 			throw new IllegalStateException("MessageBus shutting down");
 		}
-		synchronized (events) {
-			events.add(event, cb);
-		}
+		events.add(event, cb);
 	}
 
 	public <T extends Event> void publish(T event) {
@@ -47,31 +44,27 @@ public class MessageBus implements Runnable {
 		return (thread != null) && !requestStop;
 	}
 
-	public synchronized void start() {
+	public void start() {
 		if (requestStop) {
 			throw new IllegalStateException("MessageBus shutting down");
 		}
 		if (thread == null) {
-			thread = new Thread(this);
+			thread = new Thread(() -> {
+				// This call loops until the EventQueue is shut down
+				events.forEach(wrapper -> dispatch(wrapper));
+				subscriptions.shutdown();
+				thread = null;
+				requestStop = false;
+			});
 			thread.start();
 		}
 	}
 
-	public synchronized void stop() {
+	public void stop() {
 		if (thread != null) {
 			requestStop = true;
 			events.shutdown();
 		}
-	}
-
-	@Override
-	public void run() {
-		for (Optional<EventWrapper<? extends Event>> optional : events.iterable()) {
-			optional.ifPresent(wrapper -> dispatch(wrapper));
-		}
-		subscriptions.shutdown();
-		thread = null;
-		requestStop = false;
 	}
 
 	private <T extends Event> void dispatch(EventWrapper<T> wrapper) {
