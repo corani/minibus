@@ -1,5 +1,6 @@
 package nl.loadingdata.messagebus;
 import java.util.List;
+import java.util.Optional;
 
 
 public class MessageBus implements Runnable {
@@ -38,7 +39,7 @@ public class MessageBus implements Runnable {
 	}
 
 	public boolean isIdle() {
-		if (!events.isEmpty()) return false;
+		if (!events.isIdle()) return false;
 		return subscriptions.isIdle();
 	}
 
@@ -65,12 +66,10 @@ public class MessageBus implements Runnable {
 
 	@Override
 	public void run() {
-		while (!requestStop) {
-			events.next()
-				.ifPresent(event -> dispatch(event));
+		for (Optional<EventWrapper<? extends Event>> optional : events.iterable()) {
+			optional.ifPresent(wrapper -> dispatch(wrapper));
 		}
 		subscriptions.shutdown();
-		events.shutdown();
 		thread = null;
 		requestStop = false;
 	}

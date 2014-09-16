@@ -1,12 +1,13 @@
 package nl.loadingdata.messagebus;
 
+import java.util.Optional;
 
-public class Subscription<T extends Event> implements Runnable {
+
+class Subscription<T extends Event> implements Runnable {
 	private MessageBus bus;
 	private EventQueue pending;
 	private EventHandler<T> eventListener;
 	private Thread thread;
-	private boolean running;
 	private Class<T> clazz;
 	private EventFilter<T> filter;
 
@@ -16,18 +17,16 @@ public class Subscription<T extends Event> implements Runnable {
 		this.clazz = clazz;
 		this.eventListener = listener;
 		pending = new EventQueue();
-		running = true;
 		thread = new Thread(this);
 		thread.start();
 	}
 
 	public void run() {
-		while (running) {
-			pending.next()
-				.ifPresent(event -> {
-					eventListener.onEvent(pending.unwrap(event));
-					event.complete();
-				});
+		for (Optional<EventWrapper<? extends Event>> optional : pending.iterable()) {
+			optional.ifPresent(event -> {
+				eventListener.onEvent(pending.unwrap(event));
+				event.complete();
+			});
 		}
 	}
 
@@ -35,12 +34,10 @@ public class Subscription<T extends Event> implements Runnable {
 		bus.unsubscribe(this);
 		bus = null;
 
-		running = false;
+		pending.shutdown();
 		synchronized (thread) {
 			thread.notify();
 		}
-
-		pending.shutdown();
 	}
 
 	void dispatch(EventWrapper<T> event) {

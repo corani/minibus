@@ -1,54 +1,84 @@
 package nl.loadingdata.messagebus;
 
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Optional;
+import java.util.Queue;
 
-public class EventQueue extends LinkedList<EventWrapper<? extends Event>>{
-	private static final long serialVersionUID = 1176368599120850502L;
+class EventQueue {
+	private Queue<EventWrapper<? extends Event>> queue = new LinkedList<>();
 	private boolean running = true;
 
-	public synchronized Optional<EventWrapper<? extends Event>> next() {
-		EventWrapper<? extends Event> event = null;
-		while (running && event == null) {
-			event = poll();
-			if (event == null) {
-				waitForEvent();
+	private class EQIterator<T> implements Iterator<Optional<T>> {
+		@Override
+		public Optional<T> next() {
+			T event = null;
+			while (running && event == null) {
+				synchronized (queue) {
+					event = cast(queue.poll());
+				}
+				if (event == null) {
+					waitForEvent();
+				}
 			}
+			return Optional.ofNullable(event);
 		}
-		return Optional.ofNullable(event);
+		
+		@SuppressWarnings("unchecked")
+		private T cast(EventWrapper<? extends Event> event) {
+			return (T) event;
+		}
+		
+		@Override
+		public boolean hasNext() {
+			return running;
+		}
 	}
 	
-	public synchronized <E extends Event> boolean add(EventWrapper<E> ew) {
+	public Iterable<Optional<EventWrapper<? extends Event>>> iterable() {
+		return () -> new EQIterator<>();
+	}
+	
+	public <E extends Event> boolean add(E event, EventHandledCallback<E> cb) {
+		return add(wrap(event, cb));
+	}
+
+	public <E extends Event> boolean add(EventWrapper<E> wrapper) {
 		if (running) {
-			super.add(ew);
-			notify();
+			synchronized (queue) {
+				queue.add(wrapper);
+			}
+			synchronized (this) {
+				notify();
+			}
 		}
 		return running;
 	}
 	
-	public synchronized <E extends Event> boolean add(E event, EventHandledCallback<E> cb) {
-		return add(wrap(event, cb));
-	}
-	
-	public synchronized void shutdown() {
+	public void shutdown() {
 		running = false;
-		forEach(e -> e.complete());
-		clear();
-		notify();
+		synchronized (queue) {
+			queue.forEach(e -> e.complete());
+			queue.clear();
+		}
+		synchronized (this) {
+			notify();
+		}
 	}
 	
-	public synchronized boolean isIdle() {
-		return isEmpty();
+	public boolean isIdle() {
+		synchronized (queue) {
+			return queue.isEmpty();
+		}
 	}
 
 	@SuppressWarnings("unchecked")
-	public <T> T unwrap(EventWrapper<? extends Event> event) {
+	public <T extends Event> T unwrap(EventWrapper<? extends Event> event) {
 		return (T) event.getEvent();
 	}
 
-	@SuppressWarnings({ "rawtypes", "unchecked" })
-	public <E extends Event> EventWrapper<? extends Event> wrap(E event, EventHandledCallback<E> cb) {
-		return new EventWrapper(event, cb);
+	private <E extends Event> EventWrapper<E> wrap(E event, EventHandledCallback<E> cb) {
+		return new EventWrapper<E>(event, cb);
 	}
 	
 	private synchronized void waitForEvent() {

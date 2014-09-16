@@ -3,7 +3,7 @@ package nl.loadingdata.messagebus;
 import java.util.ArrayList;
 import java.util.List;
 
-public class SubscriptionList extends ArrayList<Subscription<? extends Event>> {
+class SubscriptionList extends ArrayList<Subscription<? extends Event>> {
 	private static final long serialVersionUID = -696666819507098269L;
 
 	public synchronized <T extends Event> boolean add(Subscription<T> sub) {

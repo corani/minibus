@@ -1,6 +1,6 @@
 package nl.loadingdata.messagebus;
 
-public class EventWrapper<T extends Event> {
+class EventWrapper<T extends Event> {
 	private T event;
 	private EventHandledCallback<T> cb;
 	private int subscribers;
