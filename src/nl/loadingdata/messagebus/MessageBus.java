@@ -1,10 +1,8 @@
 package nl.loadingdata.messagebus;
 
-import java.util.List;
 
 public class MessageBus {
-	private Thread thread;
-	private boolean requestStop = false;
+	private boolean running = false;
 	private EventQueue events = new EventQueue();
 	private SubscriptionList subscriptions = new SubscriptionList();
 
@@ -19,15 +17,12 @@ public class MessageBus {
 	}
 
 	public void unsubscribe(Subscription<? extends Event> sub) {
-		if (!requestStop) {
+		if (running) {
 			subscriptions.remove(sub);
 		}
 	}
 
 	public <T extends Event> void publish(T event, EventHandledCallback<T> cb) {
-		if (requestStop) {
-			throw new IllegalStateException("MessageBus shutting down");
-		}
 		events.add(event, cb);
 	}
 
@@ -41,36 +36,32 @@ public class MessageBus {
 	}
 
 	public boolean isRunning() {
-		return (thread != null) && !requestStop;
+		return !running;
 	}
 
 	public void start() {
-		if (requestStop) {
-			throw new IllegalStateException("MessageBus shutting down");
-		}
-		if (thread == null) {
-			thread = new Thread(() -> {
+		if (!running) {
+			new Thread(() -> {
 				// This call loops until the EventQueue is shut down
 				events.forEach(wrapper -> dispatch(wrapper));
-				subscriptions.shutdown();
-				thread = null;
-				requestStop = false;
-			});
-			thread.start();
+			}).start();
+			running = true;
 		}
 	}
 
 	public void stop() {
-		if (thread != null) {
-			requestStop = true;
+		if (running) {
+			running = false;
 			events.shutdown();
+			subscriptions.shutdown();
 		}
 	}
 
 	private <T extends Event> void dispatch(EventWrapper<T> wrapper) {
-		List<Subscription<T>> matching = subscriptions.allMatching(wrapper.getEvent());
-		wrapper.setSubscribers(matching.size());
-		matching.forEach(sub -> sub.dispatch(wrapper));
+		subscriptions.allMatching(wrapper.getEvent(), matching -> {
+			wrapper.setSubscribers(matching.size());
+			matching.forEach(sub -> sub.dispatch(wrapper));
+		});
 	}
 
 }

@@ -6,7 +6,6 @@ class Subscription<T extends Event> {
 	private MessageBus bus;
 	private EventQueue pending;
 	private EventHandler<T> eventListener;
-	private Thread thread;
 	private Class<T> clazz;
 	private EventFilter<T> filter;
 
@@ -16,14 +15,13 @@ class Subscription<T extends Event> {
 		this.clazz = clazz;
 		this.eventListener = listener;
 		pending = new EventQueue();
-		thread = new Thread(() -> {
+		new Thread(() -> {
 			// This call loops until the event queue is shut down
 			pending.forEach(event -> {
 				eventListener.onEvent(pending.unwrap(event));
 				event.complete();
 			});
-		});
-		thread.start();
+		}).start();
 	}
 
 	public void shutdown() {

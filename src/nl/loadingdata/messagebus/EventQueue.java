@@ -65,7 +65,7 @@ class EventQueue {
 	
 	public boolean isIdle() {
 		synchronized (queue) {
-			return queue.isEmpty();
+			return queue.isEmpty() && running;
 		}
 	}
 
