@@ -1,13 +1,13 @@
 package nl.loadingdata.messagebus;
 
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.Optional;
 import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.Consumer;
 
 class EventQueue {
-	private Queue<EventWrapper<? extends Event>> queue = new LinkedList<>();
+	private Queue<EventWrapper<? extends Event>> queue = new ConcurrentLinkedQueue<>();
 	private boolean running = true;
 
 	private class EQIterator<T> implements Iterator<Optional<T>> {
@@ -15,9 +15,7 @@ class EventQueue {
 		public Optional<T> next() {
 			T event = null;
 			while (running && event == null) {
-				synchronized (queue) {
-					event = cast(queue.poll());
-				}
+				event = cast(queue.poll());
 				if (event == null) {
 					waitForEvent();
 				}
@@ -42,9 +40,7 @@ class EventQueue {
 
 	public <E extends Event> boolean add(EventWrapper<E> wrapper) {
 		if (running) {
-			synchronized (queue) {
-				queue.add(wrapper);
-			}
+			queue.add(wrapper);
 			synchronized (this) {
 				notify();
 			}
@@ -54,19 +50,15 @@ class EventQueue {
 	
 	public void shutdown() {
 		running = false;
-		synchronized (queue) {
-			queue.forEach(e -> e.cancel());
-			queue.clear();
-		}
+		queue.forEach(e -> e.cancel());
+		queue.clear();
 		synchronized (this) {
 			notify();
 		}
 	}
 	
 	public boolean isIdle() {
-		synchronized (queue) {
-			return queue.isEmpty() && running;
-		}
+		return queue.isEmpty() && running;
 	}
 
 	@SuppressWarnings("unchecked")
