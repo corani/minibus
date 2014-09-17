@@ -7,9 +7,7 @@ public class MessageBus {
 	private SubscriptionList subscriptions = new SubscriptionList();
 
 	public <T extends Event> Subscription<T> subscribe(Class<T> clazz, EventFilter<T> filter, EventHandler<T> listener) {
-		Subscription<T> sub = new Subscription<T>(this, filter, clazz, listener);
-		subscriptions.add(sub);
-		return sub;
+		return subscriptions.add(new Subscription<T>(this, filter, clazz, listener));
 	}
 
 	public <T extends Event> Subscription<T> subscribe(Class<T> clazz, EventHandler<T> listener) {
@@ -31,12 +29,11 @@ public class MessageBus {
 	}
 
 	public boolean isIdle() {
-		if (!events.isIdle()) return false;
-		return subscriptions.isIdle();
+		return events.isIdle() && subscriptions.isIdle();
 	}
 
 	public boolean isRunning() {
-		return !running;
+		return running;
 	}
 
 	public void start() {

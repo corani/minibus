@@ -50,15 +50,17 @@ class EventQueue {
 	
 	public void shutdown() {
 		running = false;
-		queue.forEach(e -> e.cancel());
-		queue.clear();
+		synchronized (queue) {
+			queue.forEach(e -> e.cancel());
+			queue.clear();
+		}
 		synchronized (this) {
 			notify();
 		}
 	}
 	
 	public boolean isIdle() {
-		return queue.isEmpty() && running;
+		return running && queue.isEmpty();
 	}
 
 	@SuppressWarnings("unchecked")

@@ -8,8 +8,9 @@ import java.util.function.Consumer;
 class SubscriptionList {
 	private List<Subscription<? extends Event>> list = Collections.synchronizedList(new ArrayList<>());
 
-	public <T extends Event> boolean add(Subscription<T> sub) {
-		return list.add(sub);
+	public <T extends Event> Subscription<T> add(Subscription<T> sub) {
+		list.add(sub);
+		return sub;
 	}
 	
 	public void remove(Subscription<? extends Event> sub) {

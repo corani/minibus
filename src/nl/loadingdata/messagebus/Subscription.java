@@ -4,7 +4,7 @@ package nl.loadingdata.messagebus;
 
 class Subscription<T extends Event> {
 	private MessageBus bus;
-	private EventQueue pending;
+	private EventQueue pending = new EventQueue();
 	private EventHandler<T> eventListener;
 	private Class<T> clazz;
 	private EventFilter<T> filter;
@@ -14,7 +14,6 @@ class Subscription<T extends Event> {
 		this.filter = filter;
 		this.clazz = clazz;
 		this.eventListener = listener;
-		pending = new EventQueue();
 		new Thread(() -> {
 			// This call loops until the event queue is shut down
 			pending.forEach(event -> {

@@ -1,5 +1,7 @@
 package nl.loadingdata.example;
 
+import static java.util.stream.IntStream.range;
+
 public class FBItem {
 	public static final int NUMBER = 0;
 	public static final int FIZZ = 1;
@@ -11,26 +13,23 @@ public class FBItem {
 	private String[] slot = new String[COUNT];
 	
 	public void update(int key, boolean cond, String val) {
-		if (cond) {
-			slot[key] = val;
-		}
+		slot[key] = cond ? val : null;
 	}
 
-	private boolean emitNumber() {
-		for (int i = 1; i < slot.length - 1; i++) {
-			if (slot[i] != null) return false;
-		}
-		return true;
+	private int getStart() {
+		boolean emit = range(FIZZ, NEWLINE)
+			.mapToObj(i -> slot[i])
+			.allMatch(item -> item == null);
+		return emit ? NUMBER : FIZZ;
 	}
 	
 	@Override
 	public String toString() {
-		String result = slot[NUMBER] + ": ";
-		int start = emitNumber() ? NUMBER : FIZZ;
-		for (int i = start; i < slot.length; i++) {
-			if (slot[i] != null) result += slot[i];
-		}
-		return result;
+		return range(getStart(), COUNT)
+			.mapToObj(i -> slot[i])
+			.filter(item -> item != null)
+			.reduce(slot[NUMBER] + ": ",
+					(s1, s2) -> s1 + s2);
 	}
 
 }
